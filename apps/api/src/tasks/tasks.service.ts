@@ -9,6 +9,7 @@ import {
   CreateTaskDto,
   ListTasksQueryDto,
   PaginatedTasksResponseDto,
+  TaskCategoryEnum,
   TaskDto,
   TaskPriorityEnum,
   TaskStatusEnum,
@@ -40,6 +41,7 @@ export class TasksService {
         title: dto.title.trim(),
         description: dto.description?.trim() || null,
         priority: (dto.priority as TaskPriorityEnum) || TaskPriorityEnum.MEDIUM,
+        category: (dto.category as TaskCategoryEnum) || TaskCategoryEnum.OTHER,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         ownerId,
       },
@@ -87,7 +89,11 @@ export class TasksService {
       where.priority = query.priority;
     }
 
-    const allowedSortFields = ['createdAt', 'dueDate', 'title', 'priority', 'status'];
+    if (query.category) {
+      where.category = query.category;
+    }
+
+    const allowedSortFields = ['createdAt', 'dueDate', 'title', 'priority', 'status', 'category'];
     const sortBy = allowedSortFields.includes(query.sortBy || '') ? query.sortBy! : 'createdAt';
     const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
 
@@ -174,6 +180,7 @@ export class TasksService {
       (dto.title !== undefined && dto.title !== existing.title) ||
       (dto.description !== undefined && dto.description !== existing.description) ||
       (dto.priority !== undefined && dto.priority !== existing.priority) ||
+      (dto.category !== undefined && dto.category !== existing.category) ||
       (dto.dueDate !== undefined);
 
     if (isAlreadyCompleted && !isReopening && hasFieldChanges) {
@@ -199,6 +206,7 @@ export class TasksService {
         ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),
         ...(dto.status !== undefined ? { status: dto.status as TaskStatusEnum } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority as TaskPriorityEnum } : {}),
+        ...(dto.category !== undefined ? { category: dto.category as TaskCategoryEnum } : {}),
         ...(dto.dueDate !== undefined ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null } : {}),
       },
       include: {
@@ -247,6 +255,7 @@ export class TasksService {
       description: task.description,
       status: task.status as TaskStatusEnum,
       priority: task.priority as TaskPriorityEnum,
+      category: task.category as TaskCategoryEnum,
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : null,
       ownerId: task.ownerId,
       owner: task.owner

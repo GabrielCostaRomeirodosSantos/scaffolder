@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service';
-import { TaskPriorityEnum, TaskStatusEnum } from './task.dto';
+import { TaskCategoryEnum, TaskPriorityEnum, TaskStatusEnum } from './task.dto';
 import { TasksService } from './tasks.service';
 
 describe('TasksService', () => {
@@ -29,6 +29,7 @@ describe('TasksService', () => {
     description: 'Aprender sobre sessões opacas e Keycloak',
     status: TaskStatusEnum.PENDING,
     priority: TaskPriorityEnum.HIGH,
+    category: TaskCategoryEnum.WORK,
     dueDate: new Date(Date.now() + 86400000),
     ownerId: 'user-uuid-1',
     deletedAt: null,
@@ -80,6 +81,34 @@ describe('TasksService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('defaults category to OTHER when not informed', async () => {
+      prisma.task.create.mockResolvedValue(mockTask);
+
+      await service.create(mockUser.id, { title: 'Tarefa sem categoria' });
+
+      expect(prisma.task.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ category: TaskCategoryEnum.OTHER }),
+        }),
+      );
+    });
+
+    it('persists the informed category', async () => {
+      prisma.task.create.mockResolvedValue({ ...mockTask, category: TaskCategoryEnum.STUDY });
+
+      const result = await service.create(mockUser.id, {
+        title: 'Estudar para a prova',
+        category: TaskCategoryEnum.STUDY,
+      });
+
+      expect(prisma.task.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ category: TaskCategoryEnum.STUDY }),
+        }),
+      );
+      expect(result.category).toBe(TaskCategoryEnum.STUDY);
+    });
   });
 
   describe('findAll', () => {
@@ -115,6 +144,23 @@ describe('TasksService', () => {
         }),
       );
       expect(prisma.task.findMany.mock.calls[0][0].where.ownerId).toBeUndefined();
+    });
+
+    it('filters by category when informed', async () => {
+      prisma.task.count.mockResolvedValue(1);
+      prisma.task.findMany.mockResolvedValue([mockTask]);
+
+      await service.findAll(mockUser, {
+        page: 1,
+        pageSize: 10,
+        category: TaskCategoryEnum.WORK,
+      });
+
+      expect(prisma.task.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ category: TaskCategoryEnum.WORK }),
+        }),
+      );
     });
   });
 
@@ -177,6 +223,39 @@ describe('TasksService', () => {
           title: 'Novo Título Proibido',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects changing the category of a COMPLETED task without reopening it first', async () => {
+      const completedTask = {
+        ...mockTask,
+        status: TaskStatusEnum.COMPLETED,
+      };
+      prisma.task.findFirst.mockResolvedValue(completedTask);
+
+      await expect(
+        service.update(mockUser, mockTask.id, {
+          category: TaskCategoryEnum.PERSONAL,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('updates the category when the task is not completed', async () => {
+      prisma.task.findFirst.mockResolvedValue(mockTask);
+      prisma.task.update.mockResolvedValue({
+        ...mockTask,
+        category: TaskCategoryEnum.SHOPPING,
+      });
+
+      const result = await service.update(mockUser, mockTask.id, {
+        category: TaskCategoryEnum.SHOPPING,
+      });
+
+      expect(result.category).toBe(TaskCategoryEnum.SHOPPING);
+      expect(prisma.task.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ category: TaskCategoryEnum.SHOPPING }),
+        }),
+      );
     });
 
     it('allows editing if status is reopened to PENDING', async () => {

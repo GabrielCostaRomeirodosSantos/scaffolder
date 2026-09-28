@@ -53,7 +53,7 @@ export class TasksController {
   @Get()
   @ApiOperation({
     summary: 'Listar tarefas paginadas',
-    description: 'Lista tarefas com paginação, busca por texto, filtro por status/prioridade e ordenação.',
+    description: 'Lista tarefas com paginação, busca por texto, filtro por status/prioridade/categoria e ordenação.',
   })
   @ApiResponse({ status: 200, description: 'Lista paginada de tarefas', type: PaginatedTasksResponseDto })
   @ApiResponse({ status: 401, description: 'Não autenticado', type: ProblemDetailsDto })
